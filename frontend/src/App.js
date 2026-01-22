@@ -22,34 +22,43 @@ function App() {
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
-    if (step === 'chat' && !socketRef.current) {
-      socketRef.current = io(SERVER_URL, {
-        transports: ['websocket', 'polling'],
-        withCredentials: true
-      });
+    if (step === 'chat') {
+      // Connect to socket if not already connected
+      if (!socketRef.current) {
+        socketRef.current = io(SERVER_URL, {
+          transports: ['websocket', 'polling'],
+          withCredentials: true
+        });
+      }
+
+      // Join the room
       socketRef.current.emit('join_room', { roomCode, username });
-      socketRef.current.on('receive_message', (data) => {
+
+      // Set up event listeners
+      const handleReceiveMessage = (data) => {
         setMessages((msgs) => [...msgs, { user: data.username, text: data.message }]);
-      });
-      socketRef.current.on('user_joined', (data) => {
+      };
+
+      const handleUserJoined = (data) => {
         setMessages((msgs) => [...msgs, { user: 'System', text: `${data.username} joined the room.` }]);
-      });
-      socketRef.current.on('user_left', (data) => {
+      };
+
+      const handleUserLeft = (data) => {
         setMessages((msgs) => [...msgs, { user: 'System', text: `A user left the room.` }]);
-      });
-      socketRef.current.on('error', (data) => {
+      };
+
+      const handleError = (data) => {
         const errorMsg = typeof data === 'string' ? data : (data?.message || 'An error occurred');
         setError(errorMsg);
         setSummaryLoading(false);
-      });
+      };
 
-      // Listen for summary generation events
-      socketRef.current.on('summary_generating', () => {
+      const handleSummaryGenerating = () => {
         setSummaryLoading(true);
         setError('');
-      });
+      };
 
-      socketRef.current.on('summary_generated', (data) => {
+      const handleSummaryGenerated = (data) => {
         setSummaryLoading(false);
         setSummaryData({
           summary: data.summary,
@@ -58,23 +67,36 @@ function App() {
           messageCount: data.messageCount || 0
         });
         setShowSummaryModal(true);
-      });
+      };
 
-      socketRef.current.on('room_closed', () => {
-        // Clear summary data and close modal when room is closed
+      const handleRoomClosed = () => {
         setSummaryData(null);
         setShowSummaryModal(false);
         setSummaryLoading(false);
-      });
+      };
+
+      // Attach listeners
+      socketRef.current.on('receive_message', handleReceiveMessage);
+      socketRef.current.on('user_joined', handleUserJoined);
+      socketRef.current.on('user_left', handleUserLeft);
+      socketRef.current.on('error', handleError);
+      socketRef.current.on('summary_generating', handleSummaryGenerating);
+      socketRef.current.on('summary_generated', handleSummaryGenerated);
+      socketRef.current.on('room_closed', handleRoomClosed);
+
+      // Cleanup listeners when component unmounts or step changes
+      return () => {
+        socketRef.current?.off('receive_message', handleReceiveMessage);
+        socketRef.current?.off('user_joined', handleUserJoined);
+        socketRef.current?.off('user_left', handleUserLeft);
+        socketRef.current?.off('error', handleError);
+        socketRef.current?.off('summary_generating', handleSummaryGenerating);
+        socketRef.current?.off('summary_generated', handleSummaryGenerated);
+        socketRef.current?.off('room_closed', handleRoomClosed);
+      };
     }
-    return () => {
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-        socketRef.current = null;
-      }
-    };
     // eslint-disable-next-line
-  }, [step]);
+  }, [step, roomCode, username]);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -82,6 +104,16 @@ function App() {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages]);
+
+  // Disconnect socket when leaving chat
+  useEffect(() => {
+    return () => {
+      if (socketRef.current && step === 'lobby') {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
+    };
+  }, [step]);
 
   const handleCreateRoom = async () => {
     if (!inputUsername) return setError('Enter a username');
