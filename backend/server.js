@@ -10,8 +10,9 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: 'https://convo-q85p.vercel.app', // Update with your frontend URL
-    methods: ['GET', 'POST']
+    origin: ["https://convo-q85p.vercel.app", "http://localhost:3000"],
+    methods: ["GET", "POST"],
+    credentials: true
   }
 });
 
@@ -83,18 +84,18 @@ function validateMessage(message) {
   if (!message || typeof message !== 'string') {
     return { valid: false, error: 'Message must be a non-empty string' };
   }
-  
+
   if (message.trim().length === 0) {
     return { valid: false, error: 'Message cannot be empty' };
   }
-  
+
   if (message.length > MAX_CHARACTERS_PER_MESSAGE) {
-    return { 
-      valid: false, 
-      error: `Message exceeds maximum length of ${MAX_CHARACTERS_PER_MESSAGE} characters` 
+    return {
+      valid: false,
+      error: `Message exceeds maximum length of ${MAX_CHARACTERS_PER_MESSAGE} characters`
     };
   }
-  
+
   return { valid: true };
 }
 
@@ -114,7 +115,7 @@ function formatMessagesForPrompt(messages) {
   if (!messages || messages.length === 0) {
     return 'No messages in this conversation.';
   }
-  
+
   return messages.map((msg, index) => {
     const timestamp = new Date(msg.timestamp).toLocaleString();
     return `[${timestamp}] ${msg.username}: ${msg.message}`;
@@ -133,7 +134,7 @@ async function generateSummary(roomCode) {
 
   // Format messages for the prompt
   const conversationText = formatMessagesForPrompt(room.messages);
-  
+
   // Construct the prompt with explicit requirements
   const prompt = `You are analyzing a conversation between two users in a chat room. Please provide a structured summary in the following JSON format:
 
@@ -154,7 +155,7 @@ Please respond with ONLY valid JSON, no additional text or markdown formatting.`
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
-    
+
     // Parse the JSON response
     // Sometimes Gemini wraps JSON in markdown code blocks, so we clean it
     let cleanedText = text.trim();
@@ -163,9 +164,9 @@ Please respond with ONLY valid JSON, no additional text or markdown formatting.`
     } else if (cleanedText.startsWith('```')) {
       cleanedText = cleanedText.replace(/^```\s*/, '').replace(/\s*```$/, '');
     }
-    
+
     const summaryData = JSON.parse(cleanedText);
-    
+
     // Validate and structure the response
     return {
       summary: summaryData.summary || 'No summary available',
@@ -196,18 +197,18 @@ function cleanupRoom(roomCode) {
 function expireInactiveRooms() {
   const now = Date.now();
   const expiredRooms = [];
-  
+
   for (const [roomCode, room] of Object.entries(rooms)) {
     if (now - room.lastActivity > ROOM_INACTIVITY_TIMEOUT) {
       expiredRooms.push(roomCode);
     }
   }
-  
+
   expiredRooms.forEach(roomCode => {
     console.log(`Auto-expiring inactive room: ${roomCode}`);
     cleanupRoom(roomCode);
   });
-  
+
   return expiredRooms.length;
 }
 
@@ -236,7 +237,7 @@ app.post('/api/create-room', (req, res) => {
   do {
     roomCode = generateRoomCode();
   } while (rooms[roomCode]);
-  
+
   // Initialize room with message storage and activity tracking
   rooms[roomCode] = {
     users: [],
@@ -244,7 +245,7 @@ app.post('/api/create-room', (req, res) => {
     lastActivity: Date.now(),
     createdAt: Date.now()
   };
-  
+
   res.json({ roomCode });
 });
 
@@ -269,11 +270,11 @@ io.on('connection', (socket) => {
       socket.emit('error', { message: 'Room does not exist' });
       return;
     }
-    
+
     socket.join(roomCode);
     rooms[roomCode].users.push({ id: socket.id, username });
     rooms[roomCode].lastActivity = Date.now();
-    
+
     io.to(roomCode).emit('user_joined', { username });
   });
 
@@ -283,41 +284,41 @@ io.on('connection', (socket) => {
    */
   socket.on('send_message', ({ roomCode, username, message }) => {
     const room = rooms[roomCode];
-    
+
     if (!room) {
       socket.emit('error', { message: 'Room does not exist' });
       return;
     }
-    
+
     // Validate message
     const validation = validateMessage(message);
     if (!validation.valid) {
       socket.emit('error', { message: validation.error });
       return;
     }
-    
+
     // Check message limit
     if (hasReachedMessageLimit(roomCode)) {
-      socket.emit('error', { 
-        message: `Room has reached maximum message limit of ${MAX_MESSAGES_PER_ROOM}` 
+      socket.emit('error', {
+        message: `Room has reached maximum message limit of ${MAX_MESSAGES_PER_ROOM}`
       });
       return;
     }
-    
+
     // Store message in memory
     const messageData = {
       username,
       message: message.trim(),
       timestamp: Date.now()
     };
-    
+
     room.messages.push(messageData);
     room.lastActivity = Date.now();
-    
+
     // Broadcast to all users in the room
-    io.to(roomCode).emit('receive_message', { 
-      username, 
-      message: message.trim() 
+    io.to(roomCode).emit('receive_message', {
+      username,
+      message: message.trim()
     });
   });
 
@@ -327,24 +328,24 @@ io.on('connection', (socket) => {
    */
   socket.on('generate_summary', async ({ roomCode }) => {
     const room = rooms[roomCode];
-    
+
     if (!room) {
       socket.emit('error', { message: 'Room does not exist' });
       return;
     }
-    
+
     if (!room.messages || room.messages.length === 0) {
       socket.emit('error', { message: 'No messages to summarize' });
       return;
     }
-    
+
     try {
       // Emit loading state
       socket.emit('summary_generating', { roomCode });
-      
+
       // Generate summary using Gemini API
       const summary = await generateSummary(roomCode);
-      
+
       // Send summary to all users in the room
       io.to(roomCode).emit('summary_generated', {
         roomCode,
@@ -353,17 +354,17 @@ io.on('connection', (socket) => {
         actionItems: summary.actionItems,
         messageCount: room.messages.length
       });
-      
+
       // Clean up room data after a short delay to ensure clients receive the summary
       setTimeout(() => {
         cleanupRoom(roomCode);
         io.to(roomCode).emit('room_closed', { roomCode });
       }, 2000); // 2 second delay for clients to receive summary
-      
+
     } catch (error) {
       console.error('Summary generation error:', error);
-      socket.emit('error', { 
-        message: error.message || 'Failed to generate summary' 
+      socket.emit('error', {
+        message: error.message || 'Failed to generate summary'
       });
     }
   });

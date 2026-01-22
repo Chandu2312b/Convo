@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import io from 'socket.io-client';
 import './App.css';
 
-const SERVER_URL = 'https://convo-kappa-one.vercel.app';
+const SERVER_URL = 'https://convo-39d3.onrender.com';
 
 function App() {
   const [step, setStep] = useState('lobby'); // lobby, chat
@@ -42,13 +42,13 @@ function App() {
         setError(errorMsg);
         setSummaryLoading(false);
       });
-      
+
       // Listen for summary generation events
       socketRef.current.on('summary_generating', () => {
         setSummaryLoading(true);
         setError('');
       });
-      
+
       socketRef.current.on('summary_generated', (data) => {
         setSummaryLoading(false);
         setSummaryData({
@@ -59,7 +59,7 @@ function App() {
         });
         setShowSummaryModal(true);
       });
-      
+
       socketRef.current.on('room_closed', () => {
         // Clear summary data and close modal when room is closed
         setSummaryData(null);
@@ -113,17 +113,17 @@ function App() {
 
   const handleGenerateSummary = () => {
     if (summaryLoading) return; // Prevent duplicate clicks
-    
+
     if (!socketRef.current) {
       setError('Not connected to server');
       return;
     }
-    
+
     if (messages.length === 0) {
       setError('No messages to summarize');
       return;
     }
-    
+
     setSummaryLoading(true);
     setError('');
     socketRef.current.emit('generate_summary', { roomCode });
@@ -131,9 +131,9 @@ function App() {
 
   const handleCopySummary = async () => {
     if (!summaryData) return;
-    
+
     const summaryText = `Conversation Summary\n\n${summaryData.summary}\n\nKey Points:\n${summaryData.keyPoints.map((point, i) => `${i + 1}. ${point}`).join('\n')}\n\nAction Items:\n${summaryData.actionItems.length > 0 ? summaryData.actionItems.map((item, i) => `${i + 1}. ${item}`).join('\n') : 'None'}`;
-    
+
     try {
       await navigator.clipboard.writeText(summaryText);
       // Show temporary success feedback
@@ -228,7 +228,7 @@ function App() {
             <h1 className="room-title">Room: <span className="room-code">{roomCode}</span></h1>
             <p className="room-subtitle">Connected as <span className="username">{username}</span></p>
           </div>
-          <button 
+          <button
             onClick={handleGenerateSummary}
             disabled={summaryLoading || messages.length === 0}
             className="btn-summary"
@@ -304,7 +304,7 @@ function App() {
                 </svg>
               </button>
             </div>
-            
+
             <div className="modal-body">
               <div className="privacy-note">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
