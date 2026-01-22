@@ -10,7 +10,7 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: '*',
+    origin: 'https://convo-q85p.vercel.app/', // Update with your frontend URL
     methods: ['GET', 'POST']
   }
 });
