@@ -23,7 +23,10 @@ function App() {
 
   useEffect(() => {
     if (step === 'chat' && !socketRef.current) {
-      socketRef.current = io(SERVER_URL);
+      socketRef.current = io(SERVER_URL, {
+        transports: ['websocket', 'polling'],
+        withCredentials: true
+      });
       socketRef.current.emit('join_room', { roomCode, username });
       socketRef.current.on('receive_message', (data) => {
         setMessages((msgs) => [...msgs, { user: data.username, text: data.message }]);
