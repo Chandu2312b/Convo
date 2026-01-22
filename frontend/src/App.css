@@ -31,10 +31,21 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20width%3D%2760%27%20height%3D%2760%27%20viewBox%3D%270%200%2060%2060%27%3E%3Cg%20fill%3D%27none%27%20fill-rule%3D%27evenodd%27%3E%3Cg%20fill%3D%27%2523ffffff%27%20fill-opacity%3D%270.05%27%3E%3Ccircle%20cx%3D%2730%27%20cy%3D%2730%27%20r%3D%272%27/%3E%3C/g%3E%3C/svg%3E");
+  background: linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.03) 25%,
+    transparent 25%,
+    transparent 50%,
+    rgba(255, 255, 255, 0.03) 50%,
+    rgba(255, 255, 255, 0.03) 75%,
+    transparent 75%,
+    transparent
+  );
+  background-size: 40px 40px;
   opacity: 0.3;
   pointer-events: none;
 }
+
 
 
 
