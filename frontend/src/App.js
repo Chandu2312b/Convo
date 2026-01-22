@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import io from 'socket.io-client';
 import './App.css';
 
-const SERVER_URL = 'http://localhost:5000';
+const SERVER_URL = 'https://convo-kappa-one.vercel.app/';
 
 function App() {
   const [step, setStep] = useState('lobby'); // lobby, chat
