@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import io from 'socket.io-client';
 import './App.css';
 
+// Backend url updated
 const SERVER_URL = 'https://convo-39d3.onrender.com';
 
 function App() {
