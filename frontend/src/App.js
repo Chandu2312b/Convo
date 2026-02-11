@@ -6,6 +6,7 @@ import './App.css';
 
 // Backend url updated
 const SERVER_URL = 'https://convo-39d3.onrender.com';
+const STORAGE_KEY = 'chat-app-state';
 
 function App() {
   const [step, setStep] = useState('lobby'); // lobby, chat
@@ -22,6 +23,54 @@ function App() {
   const socketRef = useRef(null);
   const messagesEndRef = useRef(null);
 
+  // Persist chat state (room, user, messages) to localStorage
+  const persistChatState = (override = {}) => {
+    try {
+      if (typeof window === 'undefined' || !window.localStorage) return;
+      const payload = {
+        roomCode,
+        username,
+        messages,
+        ...override,
+      };
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    } catch {
+      // Ignore storage errors to avoid breaking UX
+    }
+  };
+
+  // Clear persisted chat state
+  const clearChatState = () => {
+    try {
+      if (typeof window === 'undefined' || !window.localStorage) return;
+      window.localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // Ignore storage errors
+    }
+  };
+
+  // On initial load, restore chat state from localStorage so refresh keeps messages
+  useEffect(() => {
+    try {
+      if (typeof window === 'undefined' || !window.localStorage) return;
+      const raw = window.localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+
+      const saved = JSON.parse(raw);
+      if (!saved.roomCode || !saved.username) return;
+
+      setRoomCode(saved.roomCode);
+      setUsername(saved.username);
+      setMessages(saved.messages || []);
+      setInputUsername(saved.username);
+      setInputRoomCode(saved.roomCode);
+      setStep('chat');
+    } catch {
+      // Ignore corrupted saved state
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     if (step === 'chat') {
       // Connect to socket if not already connected
@@ -37,15 +86,27 @@ function App() {
 
       // Set up event listeners
       const handleReceiveMessage = (data) => {
-        setMessages((msgs) => [...msgs, { user: data.username, text: data.message }]);
+        setMessages((msgs) => {
+          const next = [...msgs, { user: data.username, text: data.message }];
+          persistChatState({ messages: next });
+          return next;
+        });
       };
 
       const handleUserJoined = (data) => {
-        setMessages((msgs) => [...msgs, { user: 'System', text: `${data.username} joined the room.` }]);
+        setMessages((msgs) => {
+          const next = [...msgs, { user: 'System', text: `${data.username} joined the room.` }];
+          persistChatState({ messages: next });
+          return next;
+        });
       };
 
-      const handleUserLeft = (data) => {
-        setMessages((msgs) => [...msgs, { user: 'System', text: `A user left the room.` }]);
+      const handleUserLeft = () => {
+        setMessages((msgs) => {
+          const next = [...msgs, { user: 'System', text: 'A user left the room.' }];
+          persistChatState({ messages: next });
+          return next;
+        });
       };
 
       const handleError = (data) => {
@@ -71,9 +132,15 @@ function App() {
       };
 
       const handleRoomClosed = () => {
+        // Room ended on the server: reset UI and clear local storage
         setSummaryData(null);
         setShowSummaryModal(false);
         setSummaryLoading(false);
+        setMessages([]);
+        setMessage('');
+        setRoomCode('');
+        setStep('lobby');
+        clearChatState();
       };
 
       // Attach listeners
@@ -121,9 +188,13 @@ function App() {
     setError('');
     const res = await fetch(`${SERVER_URL}/api/create-room`, { method: 'POST' });
     const data = await res.json();
-    setRoomCode(data.roomCode);
-    setUsername(inputUsername);
+    const newRoomCode = data.roomCode;
+    const newUsername = inputUsername;
+    setRoomCode(newRoomCode);
+    setUsername(newUsername);
+    setMessages([]);
     setStep('chat');
+    persistChatState({ roomCode: newRoomCode, username: newUsername, messages: [] });
   };
 
   const handleJoinRoom = async () => {
@@ -132,9 +203,13 @@ function App() {
     const res = await fetch(`${SERVER_URL}/api/room-exists/${inputRoomCode}`);
     const data = await res.json();
     if (!data.exists) return setError('Room does not exist');
-    setRoomCode(inputRoomCode);
-    setUsername(inputUsername);
+    const newRoomCode = inputRoomCode;
+    const newUsername = inputUsername;
+    setRoomCode(newRoomCode);
+    setUsername(newUsername);
+    setMessages([]);
     setStep('chat');
+    persistChatState({ roomCode: newRoomCode, username: newUsername, messages: [] });
   };
 
   const handleSendMessage = (e) => {
@@ -188,6 +263,21 @@ function App() {
   const handleCloseSummaryModal = () => {
     setShowSummaryModal(false);
     setSummaryData(null);
+  };
+
+  const handleLeaveRoom = () => {
+    if (socketRef.current) {
+      socketRef.current.disconnect();
+      socketRef.current = null;
+    }
+    setMessages([]);
+    setMessage('');
+    setRoomCode('');
+    setStep('lobby');
+    setSummaryData(null);
+    setShowSummaryModal(false);
+    setSummaryLoading(false);
+    clearChatState();
   };
 
   if (step === 'lobby') {
@@ -261,30 +351,39 @@ function App() {
             <h1 className="room-title">Room: <span className="room-code">{roomCode}</span></h1>
             <p className="room-subtitle">Connected as <span className="username">{username}</span></p>
           </div>
-          <button
-            onClick={handleGenerateSummary}
-            disabled={summaryLoading || messages.length === 0}
-            className="btn-summary"
-            title="Generate AI summary of conversation"
-          >
-            {summaryLoading ? (
-              <>
-                <span className="spinner"></span>
-                Generating...
-              </>
-            ) : (
-              <>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                  <polyline points="14 2 14 8 20 8"></polyline>
-                  <line x1="16" y1="13" x2="8" y2="13"></line>
-                  <line x1="16" y1="17" x2="8" y2="17"></line>
-                  <polyline points="10 9 9 9 8 9"></polyline>
-                </svg>
-                Generate Summary
-              </>
-            )}
-          </button>
+          <div className="chat-actions">
+            <button
+              onClick={handleGenerateSummary}
+              disabled={summaryLoading || messages.length === 0}
+              className="btn-summary"
+              title="Generate AI summary of conversation"
+            >
+              {summaryLoading ? (
+                <>
+                  <span className="spinner"></span>
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10 9 9 9 8 9"></polyline>
+                  </svg>
+                  Generate Summary
+                </>
+              )}
+            </button>
+            <button
+              onClick={handleLeaveRoom}
+              className="btn-leave-room"
+              type="button"
+            >
+              Leave Room
+            </button>
+          </div>
         </div>
       </header>
       <main className="chat-main">

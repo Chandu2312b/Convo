@@ -67,8 +67,9 @@
 
 .chat-header .header-content {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
+  justify-content: space-between;
   gap: 1rem;
 }
 
@@ -121,6 +122,12 @@
   color: #ffffff;
 }
 
+.chat-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
 /* Summary Button */
 .btn-summary {
   display: flex;
@@ -154,6 +161,27 @@
   opacity: 0.6;
   cursor: not-allowed;
   transform: none;
+}
+
+.btn-leave-room {
+  padding: 0.75rem 1.2rem;
+  border-radius: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.6);
+  background: transparent;
+  color: #ffffff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-leave-room:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+.btn-leave-room:active {
+  transform: translateY(0);
 }
 
 .btn-summary svg {
